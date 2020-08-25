@@ -17,21 +17,46 @@ const removeFileExt = name =>
       name.length
   );
 
+const helperMethods = modules =>
+  ((modulesArr, modulesObj) => ({
+    map: (callback) =>
+      modulesArr.reduce((acc, module) => {
+        const [key] = module;
+        acc[key] = callback(module, modulesObj);
+        return acc;
+      }, {}),
+    filter: (callback) =>
+      modulesArr.reduce((acc, module) => {
+        const [key, value] = module;
+        if (callback(module, modulesObj))
+          acc[key] = value;
+        return acc;
+      }, {}),
+    reduce: (callback, initAcc) =>
+      modulesArr.reduce((acc, module) =>
+        callback(acc, module, modulesObj),
+      initAcc),
+    forEach: (callback) => {
+      modulesArr.forEach(module => callback(module, modulesObj));
+      return modulesObj;
+    }
+  }))(Object.entries(modules), modules);
+
 // Requires all the modules from the path of `modulePath` and
 // exports them with camelCase style of their filename
 // also runs a modifier before exporting them as an object
-const requireAll = (modulePath, modifier = m => m) => {
+const requireAll = modulePath => {
   const [dirname, basename] = [
     path.dirname(modulePath),
     path.basename(modulePath),
   ];
-  return fs.readdirSync(dirname)
+  const modules = fs.readdirSync(dirname)
     .filter(fileName => fileName.toLowerCase() !== basename)
-    .map(modifier)
     .reduce((exports, requireName) =>
       (exports[camelCase(removeFileExt(requireName))] = require(path.join(dirname, requireName)),
       exports),
     {});
+  return Object.setPrototypeOf(modules, helperMethods(modules));
 };
 
 module.exports = requireAll;

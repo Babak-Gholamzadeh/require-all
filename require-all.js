@@ -18,7 +18,12 @@ const removeFileExt = name =>
   );
 
 const helperMethods = modules =>
-  ((modulesArr, modulesObj) => ({
+  (methods =>
+    Object.entries(methods).reduce((wrappedMethods, [methodName, methodValue]) =>
+      (wrappedMethods[methodName] = (...args) => normalize(methodValue(...args)),
+      wrappedMethods),
+    {})
+  )(((modulesArr, modulesObj) => ({
     map: (callback) =>
       modulesArr.reduce((acc, module) => {
         const [key] = module;
@@ -32,7 +37,7 @@ const helperMethods = modules =>
           acc[key] = value;
         return acc;
       }, {}),
-    reduce: (callback, initAcc) =>
+    reduce: (callback, initAcc = {}) =>
       modulesArr.reduce((acc, module) =>
         callback(acc, module, modulesObj),
       initAcc),
@@ -40,23 +45,22 @@ const helperMethods = modules =>
       modulesArr.forEach(module => callback(module, modulesObj));
       return modulesObj;
     }
-  }))(Object.entries(modules), modules);
+  }))(Object.entries(modules), modules));
+
+const normalize = modules =>
+  Object.setPrototypeOf(modules, helperMethods(modules));
 
 // Requires all the modules from the path of `modulePath` and
 // exports them with camelCase style of their filename
 // also runs a modifier before exporting them as an object
-const requireAll = modulePath => {
-  const [dirname, basename] = [
-    path.dirname(modulePath),
-    path.basename(modulePath),
-  ];
-  const modules = fs.readdirSync(dirname)
-    .filter(fileName => fileName.toLowerCase() !== basename)
-    .reduce((exports, requireName) =>
-      (exports[camelCase(removeFileExt(requireName))] = require(path.join(dirname, requireName)),
-      exports),
-    {});
-  return Object.setPrototypeOf(modules, helperMethods(modules));
-};
+const requireAll = modulePath =>
+  ((dirname, basename) =>
+    normalize(fs.readdirSync(dirname)
+      .filter(fileName => fileName.toLowerCase() !== basename)
+      .reduce((exports, requireName) =>
+        (exports[camelCase(removeFileExt(requireName))] = require(path.join(dirname, requireName)),
+        exports),
+      {}))
+  )(path.dirname(modulePath), path.basename(modulePath));
 
 module.exports = requireAll;
